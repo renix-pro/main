@@ -1,0 +1,796 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   RENIX vNEXT — GLOBAL CSS FOUNDATION
+   Palette: Modern Cool — Clean Neutrals / Copper Accent
+   Canon: Render-Locked
+========================================================= */
+
+/* -------------------------
+   ROOT VARIABLES
+------------------------- */
+
+:root {
+  /* Light background gradient — clean cool */
+  --bg-light-1: #ffffff;
+  --bg-light-2: #f6f7f9;
+  --bg-light-3: #eceff3;
+
+  /* Dark background gradient — deep navy */
+  --bg-dark-1: #121621;
+  --bg-dark-2: #0b0e14;
+  --bg-dark-3: #000000;
+
+  /* Surfaces — clean neutrals */
+  --surface-light-1: #ffffff;
+  --surface-light-2: #f1f3f6;
+  --surface-light-3: #e8ebf0;
+
+  --surface-dark-1: #121621;
+  --surface-dark-2: #1a1f2e;
+  --surface-dark-3: #242a3a;
+
+  /* Text — crisp slate */
+  --text-light-primary: #0f172a;
+  --text-light-secondary: #475569;
+  --text-light-muted: #64748b;
+
+  --text-dark-primary: #e5e7eb;
+  --text-dark-secondary: #9ca3af;
+  --text-dark-muted: #6b7280;
+
+  /* Brand Accent — Warm Copper (accent only, never backgrounds) */
+  --accent-copper: #B8805A;
+  --accent-copper-hover: #A06F4C;
+  --accent-copper-light: rgba(184, 128, 90, 0.10);
+  --accent-primary: 27 40% 54%;
+
+  /* Signal Colors — bright, pop against clean surfaces */
+  --signal-success: #34C759;
+  --signal-warning: #FFAA33;
+  --signal-danger: #E8503A;
+  --signal-info: #5B9BD5;
+
+  /* Status (mapped to signals for consistency) */
+  --status-draft: #FFAA33;
+  --status-pending: #5B9BD5;
+  --status-approved: #34C759;
+  --status-declined: #E8503A;
+  --status-ok: 145 65% 49%;
+
+  /* Status backgrounds (subtle) - light mode */
+  --status-approved-bg: rgba(52, 199, 89, 0.08);
+  --status-pending-bg: rgba(91, 155, 213, 0.08);
+  --status-draft-bg: rgba(255, 170, 51, 0.08);
+  --status-declined-bg: rgba(232, 80, 58, 0.08);
+
+  /* RENIX Palette - Chart/Visual colors (8 distinguishable) */
+  --renix-copper: #B8805A;
+  --renix-emerald: #34C759;
+  --renix-amber: #FFAA33;
+  --renix-coral: #E8503A;
+  --renix-steel: #5B9BD5;
+  --renix-sage: #7BAE7F;
+  --renix-clay: #D4915C;
+  --renix-slate: #8E8E93;
+
+  /* Landing page gradient tokens — blue/purple glow */
+  --landing-glow-blue: rgba(0, 126, 255, 0.12);
+  --landing-glow-aubergine: rgba(124, 58, 237, 0.08);
+  --landing-glow-copper: rgba(184, 128, 90, 0.05);
+
+  /* AI Companion surface tint — subtle cool */
+  --ai-surface-tint: rgba(91, 155, 213, 0.03);
+  --ai-surface-tint-dark: rgba(91, 155, 213, 0.05);
+
+  /* Borders — cool slate */
+  --border-light: rgba(15, 23, 42, 0.10);
+  --border-dark: rgba(229, 231, 235, 0.10);
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* States */
+  --disabled-opacity: 0.45;
+
+  /* Shadcn compatibility — cool light mode */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 222 47% 11%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 215 14% 47%;
+  --accent: 27 40% 54%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 10 77% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 145 65% 49%;
+  --success-foreground: 0 0% 100%;
+  --warning: 35 100% 60%;
+  --warning-foreground: 0 0% 10%;
+  --info: 211 50% 60%;
+  --info-foreground: 0 0% 100%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 27 40% 54%;
+  --radius: 10px;
+
+  /* Sidebar — clean */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-primary: 222 47% 11%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 27 40% 54%;
+
+  /* Chart colors — 8 distinguishable */
+  --chart-1: 27 40% 54%;
+  --chart-2: 145 65% 49%;
+  --chart-3: 35 100% 60%;
+  --chart-4: 8 78% 55%;
+  --chart-5: 211 50% 60%;
+  --chart-6: 134 22% 59%;
+  --chart-7: 25 55% 60%;
+  --chart-8: 0 0% 56%;
+}
+
+/* Dark mode overrides */
+.dark {
+  --background: 222 27% 6%;
+  --foreground: 220 13% 91%;
+  --card: 224 27% 10%;
+  --card-foreground: 220 13% 91%;
+  --popover: 224 27% 10%;
+  --popover-foreground: 220 13% 91%;
+  --primary: 220 13% 91%;
+  --primary-foreground: 222 27% 6%;
+  --secondary: 224 23% 14%;
+  --secondary-foreground: 220 13% 91%;
+  --muted: 224 23% 14%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 27 40% 54%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 10 77% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 145 65% 49%;
+  --success-foreground: 0 0% 100%;
+  --warning: 35 100% 60%;
+  --warning-foreground: 0 0% 10%;
+  --info: 211 50% 60%;
+  --info-foreground: 0 0% 100%;
+  --border: 220 13% 18%;
+  --input: 220 13% 18%;
+  --ring: 27 40% 54%;
+
+  --sidebar: 224 27% 10%;
+  --sidebar-foreground: 220 13% 91%;
+  --sidebar-primary: 220 13% 91%;
+  --sidebar-primary-foreground: 222 27% 6%;
+  --sidebar-accent: 224 23% 14%;
+  --sidebar-accent-foreground: 220 13% 91%;
+  --sidebar-border: 220 13% 18%;
+  --sidebar-ring: 27 40% 54%;
+
+  /* Status backgrounds (subtle) - dark mode */
+  --status-approved-bg: rgba(52, 199, 89, 0.10);
+  --status-pending-bg: rgba(91, 155, 213, 0.10);
+  --status-draft-bg: rgba(255, 170, 51, 0.10);
+  --status-declined-bg: rgba(232, 80, 58, 0.10);
+
+  /* Landing page gradient tokens - dark mode (more visible) */
+  --landing-glow-blue: rgba(0, 126, 255, 0.18);
+  --landing-glow-aubergine: rgba(124, 58, 237, 0.14);
+  --landing-glow-copper: rgba(184, 128, 90, 0.06);
+}
+
+/* -------------------------
+   BASE ELEMENTS
+------------------------- */
+
+@layer base {
+  * {
+    @apply border-border outline-none;
+  }
+
+  :focus-visible {
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.35);
+  }
+
+  input:focus-visible,
+  textarea:focus-visible {
+    box-shadow: none;
+  }
+
+  html,
+  body {
+    height: 100%;
+    font-family: var(--font-sans);
+    font-feature-settings: 'tnum' 1, 'kern' 1, 'lnum' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #ffffff;
+  }
+
+  .dark html,
+  .dark body,
+  html.dark,
+  html.dark body {
+    background-color: #121621;
+  }
+
+  body {
+    color: var(--text-light-primary);
+  }
+
+  .dark body {
+    color: var(--text-dark-primary);
+  }
+
+  p,
+  span,
+  label {
+    color: inherit;
+  }
+
+  small {
+    color: var(--text-light-muted);
+  }
+  .dark small {
+    color: var(--text-dark-muted);
+  }
+}
+
+/* =========================================================
+   RENIX GLOBAL BACKGROUND (FIXED, NON-SCROLLING)
+   Blue/purple glow gradient — modern depth
+========================================================= */
+
+#renix-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, var(--landing-glow-blue) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 30%, var(--landing-glow-aubergine) 0%, transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 90%, var(--landing-glow-copper) 0%, transparent 60%),
+    linear-gradient(
+      to bottom,
+      var(--bg-light-1) 0%,
+      var(--bg-light-2) 50%,
+      var(--bg-light-3) 100%
+    );
+}
+
+.dark #renix-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, var(--landing-glow-blue) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 30%, var(--landing-glow-aubergine) 0%, transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 90%, var(--landing-glow-copper) 0%, transparent 60%),
+    linear-gradient(
+      to bottom,
+      var(--bg-dark-1) 0%,
+      var(--bg-dark-2) 50%,
+      var(--bg-dark-3) 100%
+    );
+}
+
+#renix-app {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+/* =========================================================
+   RENIX vNEXT — COMPONENT UTILITIES
+========================================================= */
+
+@layer components {
+
+  /* -------------------------
+     SURFACES / CARDS
+  ------------------------- */
+
+  .renix-surface {
+    @apply rounded-lg;
+    background-color: var(--surface-light-1);
+    border: 1px solid var(--border-light);
+  }
+
+  .dark .renix-surface {
+    background-color: var(--surface-dark-1);
+    border-color: var(--border-dark);
+  }
+
+  .renix-surface-secondary {
+    background-color: var(--surface-light-2);
+  }
+
+  .dark .renix-surface-secondary {
+    background-color: var(--surface-dark-2);
+  }
+
+  .renix-surface-tertiary {
+    background-color: var(--surface-light-3);
+  }
+
+  .dark .renix-surface-tertiary {
+    background-color: var(--surface-dark-3);
+  }
+
+  .renix-surface-solid {
+    background: var(--surface-light-1);
+    border-radius: 12px;
+  }
+
+  .dark .renix-surface-solid {
+    background: var(--surface-dark-1);
+  }
+
+  .renix-ai-surface {
+    background-color: var(--ai-surface-tint);
+  }
+
+  .dark .renix-ai-surface {
+    background-color: var(--ai-surface-tint-dark);
+  }
+
+  /* -------------------------
+     TRANSLUCENT PANELS
+  ------------------------- */
+
+  .renix-glass {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.75);
+  }
+
+  .dark .renix-glass {
+    background-color: rgba(18, 22, 33, 0.75);
+  }
+
+  /* -------------------------
+     FRAME GLASS MORPHISM
+  ------------------------- */
+
+  .renix-frame {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .dark .renix-frame {
+    background: rgba(18, 22, 33, 0.75);
+    border: 1px solid rgba(229, 231, 235, 0.06);
+  }
+
+  /* -------------------------
+     HEADER/BAR DIVIDER REMOVAL
+  ------------------------- */
+
+  .renix-global-header,
+  .renix-project-bar {
+    border-bottom: none !important;
+    box-shadow: none !important;
+  }
+
+  /* -------------------------
+     DESKTOP-FIRST RESPONSIVE GRID
+  ------------------------- */
+
+  .renix-grid {
+    display: grid;
+    grid-template-columns: 4fr 8fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 768px) {
+    .renix-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .renix-col-primary { }
+  .renix-col-secondary { }
+
+  @media (max-width: 768px) {
+    .max-md\:grid-cols-1 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* -------------------------
+     CHART CONTAINER SCALING
+  ------------------------- */
+
+  .renix-chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 360px;
+  }
+
+  .renix-chart-container svg,
+  .renix-chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* -------------------------
+     BUTTONS — charcoal primary
+  ------------------------- */
+
+  .btn-primary {
+    @apply rounded-lg px-4 py-2 font-medium;
+    background-color: #0f172a;
+    color: #ffffff;
+  }
+
+  .dark .btn-primary {
+    background-color: #e5e7eb;
+    color: #121621;
+  }
+
+  .btn-secondary {
+    @apply rounded-lg px-4 py-2;
+    background-color: transparent;
+    border: 1px solid currentColor;
+  }
+
+  .btn-danger {
+    @apply rounded-lg px-4 py-2 font-medium;
+    background-color: var(--signal-danger);
+    color: #ffffff;
+  }
+
+  .btn-disabled {
+    opacity: var(--disabled-opacity);
+    pointer-events: none;
+  }
+
+  .btn-ghost {
+    @apply rounded-lg;
+    background-color: transparent;
+    color: var(--text-light-primary);
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--surface-light-2);
+  }
+
+  .dark .btn-ghost {
+    color: var(--text-dark-primary);
+  }
+
+  .dark .btn-ghost:hover {
+    background-color: var(--surface-dark-2);
+  }
+
+  .btn-link {
+    background-color: transparent;
+    color: var(--accent-copper);
+    text-decoration-line: underline;
+    text-underline-offset: 4px;
+  }
+
+  .btn-link:hover {
+    color: var(--accent-copper-hover);
+    text-decoration-line: underline;
+  }
+
+  /* -------------------------
+     STATUS PILLS
+  ------------------------- */
+
+  .pill {
+    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .pill-draft {
+    background-color: var(--status-draft);
+    color: var(--text-light-primary);
+  }
+
+  .pill-pending {
+    background-color: var(--status-pending);
+    color: #fff;
+  }
+
+  .pill-approved {
+    background-color: var(--status-approved);
+    color: #fff;
+  }
+
+  .pill-declined {
+    background-color: var(--status-declined);
+    color: #fff;
+  }
+
+  /* -------------------------
+     TABLES
+  ------------------------- */
+
+  .renix-table {
+    @apply w-full text-left;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .renix-table th {
+    @apply text-sm font-medium;
+    color: var(--text-light-secondary);
+  }
+
+  .dark .renix-table th {
+    color: var(--text-dark-secondary);
+  }
+
+  .renix-table td {
+    @apply py-3;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .dark .renix-table td {
+    border-top-color: var(--border-dark);
+  }
+
+  /* -------------------------
+     RESPONSIVE HELPERS
+  ------------------------- */
+
+  .renix-scroll-x {
+    @apply overflow-x-auto;
+  }
+
+  .renix-sticky-action {
+    @apply sticky bottom-0 z-20;
+  }
+}
+
+@layer utilities {
+  .text-secondary {
+    color: var(--text-light-secondary);
+  }
+  .dark .text-secondary {
+    color: var(--text-dark-secondary);
+  }
+
+  .text-muted {
+    color: var(--text-light-muted);
+  }
+  .dark .text-muted {
+    color: var(--text-dark-muted);
+  }
+
+  .bg-surface-secondary {
+    background-color: var(--surface-light-2);
+  }
+  .dark .bg-surface-secondary {
+    background-color: var(--surface-dark-2);
+  }
+
+  .bg-surface-tertiary {
+    background-color: var(--surface-light-3);
+  }
+  .dark .bg-surface-tertiary {
+    background-color: var(--surface-dark-3);
+  }
+
+  .bg-status-approved-subtle {
+    background-color: var(--status-approved-bg);
+  }
+  .dark .bg-status-approved-subtle {
+    background-color: var(--status-approved-bg);
+  }
+
+  .bg-status-pending-subtle {
+    background-color: var(--status-pending-bg);
+  }
+  .dark .bg-status-pending-subtle {
+    background-color: var(--status-pending-bg);
+  }
+
+  .bg-status-draft-subtle {
+    background-color: var(--status-draft-bg);
+  }
+  .dark .bg-status-draft-subtle {
+    background-color: var(--status-draft-bg);
+  }
+
+  .bg-status-declined-subtle {
+    background-color: var(--status-declined-bg);
+  }
+  .dark .bg-status-declined-subtle {
+    background-color: var(--status-declined-bg);
+  }
+
+  .border-subtle {
+    border-color: var(--border-light);
+  }
+  .dark .border-subtle {
+    border-color: var(--border-dark);
+  }
+
+  input[type="search"]::-webkit-search-cancel-button {
+    @apply hidden;
+  }
+
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-light-muted);
+    pointer-events: none;
+  }
+  .dark [contenteditable][data-placeholder]:empty::before {
+    color: var(--text-dark-muted);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 250ms ease-out;
+  }
+
+  /* RENIX Loader animation */
+  @keyframes renix-pulse {
+    0%   { opacity: 0.35; transform: scale(1); }
+    50%  { opacity: 1;    transform: scale(1.08); }
+    100% { opacity: 0.35; transform: scale(1); }
+  }
+
+  @keyframes renix-label-fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .renix-pulse-anim {
+    animation: renix-pulse 2s ease-in-out infinite;
+  }
+
+  .dark .renix-pulse-anim {
+    filter: invert(1);
+  }
+
+  .btn-primary .renix-pulse-anim {
+    filter: invert(1);
+  }
+
+  .dark .btn-primary .renix-pulse-anim {
+    filter: none;
+  }
+
+  .btn-danger .renix-pulse-anim {
+    filter: invert(1);
+  }
+
+
+  .renix-label {
+    opacity: 0;
+    animation: renix-label-fade 0.8s 0.5s ease-out forwards;
+  }
+
+  .renix-landing-gradient {
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, var(--landing-glow-blue) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 80% 30%, var(--landing-glow-aubergine) 0%, transparent 70%),
+      radial-gradient(ellipse 90% 40% at 50% 90%, var(--landing-glow-copper) 0%, transparent 60%),
+      hsl(var(--background));
+  }
+}
+
+.lp-animated-section {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: opacity, transform;
+}
+
+.lp-animated-section.lp-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-animated-section {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes cookieSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-cookie-slide-up {
+  animation: cookieSlideUp 0.35s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cookie-slide-up,
+  .animate-fade-in-up {
+    animation: none !important;
+  }
+}
+
+.safe-area-top {
+  padding-top: 0.75rem;
+  padding-top: env(safe-area-inset-top, 0.75rem);
+  padding-top: max(env(safe-area-inset-top, 0px), 0.75rem);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-viewport-height {
+  height: 100vh;
+  height: 100dvh;
+}
+
+@keyframes tosEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tos-enter {
+  animation: tosEnter 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tos-enter {
+    animation: none !important;
+  }
+}

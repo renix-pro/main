@@ -1,0 +1,30 @@
+node_modules
+dist
+build
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+*.zip
+.env
+.env.*.local
+.cache
+.fingerprint
+*.tsbuildinfo
+
+# Replit leftovers (not used anymore)
+.local
+.replit
+.agents
+
+# Private data — never commit (public repository)
+scripts/seed-data.sql
+scripts/storage-backup/
+attached_assets/*
+!attached_assets/RENIX_logo_1770443349731.png
+!attached_assets/RENIX_logo_1772248096351.png
+!attached_assets/image_1771746350320.png
+!attached_assets/image_1771747181688.png
+!attached_assets/image_1772443401789.png
+replit.md
+client/public/test-quote.pdf

@@ -1,0 +1,46 @@
+# Local infrastructure for RENIX development (replaces Replit's managed
+# PostgreSQL and Object Storage).
+#
+#   docker compose up -d      # start
+#   docker compose down       # stop (data is kept in named volumes)
+#   docker compose down -v    # stop and wipe all data
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: renix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: renix
+      POSTGRES_PASSWORD: renix
+      POSTGRES_DB: renix
+    ports:
+      - "5432:5432"
+    volumes:
+      - renix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renix -d renix"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Google Cloud Storage emulator. The app talks to it through the official
+  # @google-cloud/storage client, so the object storage code is unchanged
+  # apart from the credentials block (see server/replit_integrations/object_storage).
+  gcs:
+    image: fsouza/fake-gcs-server:latest
+    container_name: renix-gcs
+    restart: unless-stopped
+    command: >
+      -scheme http
+      -port 4443
+      -public-host localhost:4443
+      -external-url http://localhost:4443
+      -filesystem-root /storage
+    ports:
+      - "4443:4443"
+    volumes:
+      - renix_gcsdata:/storage
+
+volumes:
+  renix_pgdata:
+  renix_gcsdata:

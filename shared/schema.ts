@@ -1039,7 +1039,8 @@ export type CanonicalMemoryType =
   | 'vendor_added'
   | 'invoice_created'
   | 'proposal_accepted'
-  | 'proposal_rejected';
+  | 'proposal_rejected'
+  | 'execution_tasks_created';
 
 /**
  * Overview Cache - Caches AI-generated overview projections per project
@@ -1084,3 +1085,71 @@ export const documentChunks = pgTable("document_chunks", {
 ]);
 
 export type DocumentChunk = typeof documentChunks.$inferSelect;
+
+// ============================================================================
+// DOCUMENT ANNOTATIONS (append-only notes attached to a document)
+// ============================================================================
+
+/**
+ * Document annotations — free-text notes a user attaches to a document.
+ * Append-only by product rule: annotations are never edited, only added.
+ */
+export const documentAnnotations = pgTable("document_annotations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  docAnnotationDocumentIdx: index("idx_doc_annotations_document").on(table.documentId),
+  docAnnotationProjectIdx: index("idx_doc_annotations_project").on(table.projectId),
+}));
+
+export const insertDocumentAnnotationSchema = createInsertSchema(documentAnnotations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DocumentAnnotation = typeof documentAnnotations.$inferSelect;
+export type InsertDocumentAnnotation = z.infer<typeof insertDocumentAnnotationSchema>;
+
+// ============================================================================
+// QUOTE SCOPE REFERENCES (allocation of native quote rows to scope nodes)
+// ============================================================================
+
+/**
+ * Quote scope references — allocate a single row of a quote's native extraction
+ * to a scope node, optionally at a partial percentage. One native row may be
+ * split across several scopes; percentages are stored per reference.
+ *
+ * `nativeQuoteRowId` is the row id inside the version's stored native
+ * extraction JSON (quote_metadata.native_extraction_data), not a table FK.
+ */
+export const quoteScopeReferences = pgTable("quote_scope_references", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteVersionId: varchar("quote_version_id").notNull(),
+  nativeQuoteRowId: text("native_quote_row_id").notNull(),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  scopeId: varchar("scope_id").notNull(),
+  scopeAreaId: varchar("scope_area_id"),
+  scopeItemId: varchar("scope_item_id"),
+  allocationPercentage: integer("allocation_percentage").notNull().default(100),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  quoteScopeRefVersionIdx: index("idx_quote_scope_refs_version").on(table.quoteVersionId),
+  quoteScopeRefProjectIdx: index("idx_quote_scope_refs_project").on(table.projectId),
+  quoteScopeRefScopeIdx: index("idx_quote_scope_refs_scope").on(table.scopeId),
+}));
+
+export const insertQuoteScopeReferenceSchema = createInsertSchema(quoteScopeReferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type QuoteScopeReference = typeof quoteScopeReferences.$inferSelect;
+export type InsertQuoteScopeReference = z.infer<typeof insertQuoteScopeReferenceSchema>;

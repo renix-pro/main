@@ -337,12 +337,26 @@ export function registerInvoicesRoutes(app: Express): void {
         return res.status(400).json({ message: 'Invalid invoice data', errors: parsed.error.errors });
       }
 
+      for (const line of lines) {
+        if (!line.label || typeof line.amount !== 'number') {
+          return res.status(400).json({
+            message: 'Each line item requires a "label" (string) and an "amount" (number)',
+            invalidLine: line,
+          });
+        }
+      }
+
       const invoice = await storage.createInvoice(parsed.data);
 
       const createdLines = [];
       for (const line of lines) {
         if (!line.label || typeof line.amount !== 'number') {
-          continue;
+          // Reject rather than silently skipping — skipping produced invoices
+          // with a zero total and no lines.
+          return res.status(400).json({
+            message: 'Each line item requires a "label" (string) and an "amount" (number)',
+            invalidLine: line,
+          });
         }
         const lineParsed = insertInvoiceLineSchema.safeParse({
           invoiceId: invoice.id,

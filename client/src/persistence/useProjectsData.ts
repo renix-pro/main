@@ -117,7 +117,7 @@ export function useProjectsData() {
     mutationFn: projectsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects/summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['api/projects/summaries'] });
     },
   });
 
@@ -126,7 +126,7 @@ export function useProjectsData() {
       projectsApi.update(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects/summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['api/projects/summaries'] });
     },
   });
 
@@ -134,7 +134,7 @@ export function useProjectsData() {
     mutationFn: projectsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects/summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['api/projects/summaries'] });
     },
     onError: (error: Error) => {
       toast({

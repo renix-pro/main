@@ -68,8 +68,9 @@ export async function createInspiration(db: Db, insp: InsertVisionInspiration): 
 }
 
 export async function updateInspiration(db: Db, id: string, projectId: string, userId: string, updates: Partial<InsertVisionInspiration>): Promise<VisionInspiration | undefined> {
+  // visionInspirations has no updatedAt column.
   const [updated] = await db.update(visionInspirations)
-    .set({ ...updates, updatedAt: new Date() })
+    .set({ ...updates })
     .where(and(eq(visionInspirations.id, id), eq(visionInspirations.projectId, projectId), eq(visionInspirations.userId, userId)))
     .returning();
   return updated;

@@ -60,6 +60,8 @@ import {
   type InsertMessage,
 } from "@shared/schema";
 import { db } from "./db";
+import { and, eq } from "drizzle-orm";
+import { quotes } from "@shared/schema";
 import { type LifecycleStateType } from '@shared/constants';
 
 import * as userStorage from './storage/users';
@@ -221,6 +223,8 @@ export interface IStorage {
   deleteDocument(id: string, userId: string): Promise<boolean>;
 
   getAssociationsByDocument(documentId: string, userId: string): Promise<DocumentAssociation[]>;
+  getQuotesLinkedViaSourceDocuments(documentId: string, userId: string): Promise<{ quoteId: string; quoteReference: string; sourceDocumentId: string }[]>;
+  createQuoteCoverageNote(note: { quoteId: string; projectId: string; userId: string; coverageSummary: string; inferredByAi: boolean }): Promise<void>;
   createAssociation(assoc: InsertDocumentAssociation): Promise<DocumentAssociation>;
   deleteAssociation(id: string, userId: string): Promise<boolean>;
   deleteAssociationsByEntity(associationType: string, entityId: string, userId: string): Promise<number>;
@@ -715,6 +719,25 @@ export class PgStorage implements IStorage {
 
   async getAssociationsByDocument(documentId: string, userId: string): Promise<DocumentAssociation[]> {
     return documentsStorage.getAssociationsByDocument(db, documentId, userId);
+  }
+
+  async getQuotesLinkedViaSourceDocuments(documentId: string, userId: string) {
+    return documentsStorage.getQuotesLinkedViaSourceDocuments(db, documentId, userId);
+  }
+
+  /**
+   * Persist an AI/user coverage summary for a quote. There is no dedicated
+   * table; the summary is stored in quotes.notes (appended if notes exist).
+   */
+  async createQuoteCoverageNote(note: { quoteId: string; projectId: string; userId: string; coverageSummary: string; inferredByAi: boolean }): Promise<void> {
+    const [quote] = await db.select({ notes: quotes.notes }).from(quotes)
+      .where(and(eq(quotes.id, note.quoteId), eq(quotes.userId, note.userId))).limit(1);
+    if (!quote) return;
+    const label = note.inferredByAi ? 'Coverage (AI)' : 'Coverage';
+    const entry = `${label}: ${note.coverageSummary.trim()}`;
+    const notes = quote.notes && quote.notes.trim().length > 0 ? `${quote.notes.trim()}\n\n${entry}` : entry;
+    await db.update(quotes).set({ notes, updatedAt: new Date() })
+      .where(and(eq(quotes.id, note.quoteId), eq(quotes.userId, note.userId)));
   }
 
   async createAssociation(assoc: InsertDocumentAssociation): Promise<DocumentAssociation> {

@@ -1,13 +1,15 @@
-import type { Express, Request, Response } from "express";
-import { completeJson, imageBlock, pdfBlock } from "../../ai/claude";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { Express, Request, Response, NextFunction } from "express";
+import { completeJson, imageBlock, type ContentPart } from "../../ai/openai";
 import { z } from "zod";
 import { ObjectStorageService } from "../object_storage/objectStorage";
 import { PDFParse } from "pdf-parse";
 
-/** Image or PDF content block for vision-based extraction. */
-function visualBlock(base64Data: string, mimeType: string): Anthropic.ContentBlockParam {
-  return mimeType === "application/pdf" ? pdfBlock(base64Data) : imageBlock(base64Data, mimeType);
+/**
+ * Image content part for vision-based extraction. PDFs never reach here —
+ * they are parsed to text first (see extractFromObjectPath).
+ */
+function visualBlock(base64Data: string, mimeType: string): ContentPart {
+  return imageBlock(base64Data, mimeType);
 }
 
 const ExtractedLineItemSchema = z.object({
@@ -633,9 +635,14 @@ export async function classifyDocumentOnly(objectPath: string): Promise<{
   return { classification, requiresConfirmation };
 }
 
-export function registerDocumentRoutes(app: Express): void {
+type AuthMiddleware = (req: Request, res: Response, next: NextFunction) => void;
+
+export function registerDocumentRoutes(app: Express, requireAuth?: AuthMiddleware): void {
+  // These routes run Claude extraction on arbitrary object paths; never expose
+  // them without authentication (LLM spend + access to stored files).
+  const auth: AuthMiddleware = requireAuth ?? ((_req, res) => { res.status(401).json({ error: "Authentication required" }); });
   // Original endpoint for derived-only extraction (backward compatible)
-  app.post("/api/documents/extract", async (req: Request, res: Response) => {
+  app.post("/api/documents/extract", auth, async (req: Request, res: Response) => {
     try {
       const { objectPath, base64Data, mimeType, textContent } = req.body;
 
@@ -693,7 +700,7 @@ export function registerDocumentRoutes(app: Express): void {
   });
 
   // New endpoint for full extraction (native + derived)
-  app.post("/api/documents/extract-full", async (req: Request, res: Response) => {
+  app.post("/api/documents/extract-full", auth, async (req: Request, res: Response) => {
     try {
       const { objectPath, base64Data, mimeType, textContent } = req.body;
 

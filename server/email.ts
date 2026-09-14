@@ -18,6 +18,11 @@ function createTransport() {
   });
 }
 
+/** True when SMTP credentials are present, i.e. mail can actually be sent. */
+export function isEmailConfigured(): boolean {
+  return !!(SMTP_USER && SMTP_APP_PASSWORD);
+}
+
 export async function sendPasswordResetEmail(to: string, resetLink: string): Promise<boolean> {
   const transport = createTransport();
 

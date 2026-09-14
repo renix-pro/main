@@ -224,6 +224,12 @@ export function resolveFrameLoadingModes(activeFrame: string): FrameLoadingModes
  * When allowedIds is provided and non-empty, adds an inArray filter.
  * Otherwise, returns the base condition unchanged.
  */
+/** Normalize a Date / string / null column value to an ISO string or null. */
+function toIsoDate(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 function applyConstraint(
   baseCondition: SQL<unknown>,
   idColumn: any,
@@ -504,7 +510,7 @@ export async function assembleAuthoritativeState(
         ? ` (version ${q.versionNumber})`
         : '';
 
-    const reference = metadata?.reference || '';
+    const reference = metadata?.quoteNumber || '';
 
     return {
       id: q.id,
@@ -516,7 +522,7 @@ export async function assembleAuthoritativeState(
       grandTotal: centsToUnits(financials?.grossAmount),
       subtotal: centsToUnits(financials?.netAmount),
       totalTax: centsToUnits(financials?.taxAmount),
-      quoteDate: metadata?.quoteDate || q.createdAt?.toISOString() || null,
+      quoteDate: toIsoDate(metadata?.quoteDate) || q.createdAt?.toISOString() || null,
       lineItemCount: quoteLineItems.filter(li => li.quoteVersionId === lookupVersionId).length,
       versionNumber: q.versionNumber,
       commitmentStatus: q.commitmentStatus,
@@ -645,7 +651,7 @@ export async function assembleAuthoritativeState(
         const meta = quoteMetadataRows.find(m => m.quoteVersionId === lookupId);
         documentQuoteMap.set(srcDoc.documentId, {
           quoteId: quote.id,
-          reference: meta?.reference || 'Untitled Quote',
+          reference: meta?.quoteNumber || 'Untitled Quote',
           scopeName,
         });
       }
@@ -654,69 +660,16 @@ export async function assembleAuthoritativeState(
 
   const MAX_TEXT_PREVIEW = 2000;
   
-  const { getProjectDocumentInsights } = await import('../documentProcessor');
-  let documentIntelligence: {
+  // Document Intelligence (claims / interpretations / links) was removed together
+  // with its tables; the AI context keeps the empty shape so downstream
+  // serialization is unchanged.
+  const documentIntelligence: {
     claimsCount: number;
     highConfidenceFacts: Array<{ content: string; confidence: number; documentName: string }>;
     scopeLinks: Array<{ documentName: string; scopeName: string; relationship: string; confidence: number }>;
     amounts: Array<{ amount: string; context: string; documentName: string; confidence: number }>;
     dates: Array<{ date: string; context: string; documentName: string; confidence: number }>;
   } = { claimsCount: 0, highConfidenceFacts: [], scopeLinks: [], amounts: [], dates: [] };
-  
-  try {
-    const insights = await getProjectDocumentInsights(projectId, userId);
-    const docIdToName = new Map(documents.map(d => [d.id, d.fileName]));
-    
-    const highConfidenceFacts = (insights.claimsByType?.fact || [])
-      .filter(c => c.confidence >= 0.8)
-      .slice(0, 10)
-      .map(c => ({
-        content: c.content,
-        confidence: c.confidence,
-        documentName: docIdToName.get(c.documentId) || 'Unknown',
-      }));
-    
-    const scopeLinks = (insights.linksByType?.scope || [])
-      .slice(0, 10)
-      .map(link => ({
-        documentName: docIdToName.get(link.documentId) || 'Unknown',
-        scopeName: link.targetName || 'Unknown',
-        relationship: link.relationship,
-        confidence: link.confidence,
-      }));
-    
-    const amounts = (insights.claimsByType?.amount || [])
-      .filter(c => c.confidence >= 0.6)
-      .slice(0, 10)
-      .map(c => ({
-        amount: c.content,
-        context: c.extractedValue?.reasoning || '',
-        documentName: docIdToName.get(c.documentId) || 'Unknown',
-        confidence: c.confidence,
-      }));
-    
-    const dates = (insights.claimsByType?.date || [])
-      .filter(c => c.confidence >= 0.6)
-      .slice(0, 10)
-      .map(c => ({
-        date: c.content,
-        context: c.extractedValue?.reasoning || '',
-        documentName: docIdToName.get(c.documentId) || 'Unknown',
-        confidence: c.confidence,
-      }));
-    
-    const totalClaims = Object.values(insights.claimsByType || {}).reduce((sum, arr) => sum + arr.length, 0);
-    
-    documentIntelligence = {
-      claimsCount: totalClaims,
-      highConfidenceFacts,
-      scopeLinks,
-      amounts,
-      dates,
-    };
-  } catch (error) {
-    console.error('[AIContextAssembly] Error fetching document intelligence:', error);
-  }
   
   let recentUploadsForState: Array<{
     id: string;

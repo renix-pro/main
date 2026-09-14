@@ -13,10 +13,11 @@ import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { AUTH_ENABLED, TEST_USER } from "@shared/authConfig";
 import { createUser, verifyCredentials, verifyGoogleToken, updateUserName, changePassword, hashPassword } from "./auth";
-import { sendPasswordResetEmail } from "./email";
+import { sendPasswordResetEmail, isEmailConfigured } from "./email";
 import * as cheerio from "cheerio";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { registerDocumentRoutes, extractFromObjectPath, type ExtractedQuote } from "./replit_integrations/document";
+import { registerDocumentExtractionRoutes } from "./routes/documentExtraction";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerScopeRoutes } from "./routes/scope";
 import { registerBudgetRoutes } from "./routes/budget";
@@ -78,7 +79,8 @@ export async function registerRoutes(
   // ============================================
   // DOCUMENT EXTRACTION ROUTES
   // ============================================
-  registerDocumentRoutes(app);
+  registerDocumentRoutes(app, requireAuth);
+  registerDocumentExtractionRoutes(app);
 
   // ============================================
   // AUTH ROUTES
@@ -243,16 +245,33 @@ export async function registerRoutes(
     try {
       const user = await storage.getUserByEmail(email.toLowerCase());
 
+      // Whether mail can be sent at all does not depend on the account, so
+      // reporting it cannot be used to discover which emails are registered.
+      if (!isEmailConfigured()) {
+        return res.status(503).json({
+          success: false,
+          message: 'Password reset email is not configured on this server. Contact support to reset your password.',
+        });
+      }
+
       if (user) {
         const token = randomUUID();
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
         await storage.createPasswordResetToken(user.id, token, expiresAt);
 
-        const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5000';
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const forwardedHost = req.headers['x-forwarded-host'];
+        const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+          || req.headers.host
+          || `localhost:${process.env.PORT || '5000'}`;
+        const forwardedProto = req.headers['x-forwarded-proto'];
+        const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+          || (req.secure || process.env.NODE_ENV === 'production' ? 'https' : 'http');
         const resetLink = `${protocol}://${host}/set-new-password?token=${token}`;
 
-        await sendPasswordResetEmail(user.email, resetLink);
+        const sent = await sendPasswordResetEmail(user.email, resetLink);
+        if (!sent) {
+          console.error('[Auth] Password reset email failed to send for an existing account');
+        }
       }
     } catch (error) {
       console.error('[Auth] Password reset request error:', error);
@@ -896,7 +915,7 @@ export async function registerRoutes(
         return `Inspiration ${idx + 1}: ${parts.join(' | ')}`;
       }).join('\n');
 
-      const { completeText } = await import('./ai/claude');
+      const { completeText } = await import('./ai/openai');
       const raw = (await completeText({
         system: `You are a design analyst for a home renovation project. Given a collection of moodboard inspirations (captions, tags, link previews), identify 3-7 short emerging design themes that capture the overall aesthetic direction. Each theme should be 2-4 words (e.g., "Natural Materials", "Warm Minimalism", "Industrial Accents"). Return ONLY a JSON array of strings, no explanation.`,
         messages: [{ role: 'user', content: `Analyze these ${activeInspirations.length} moodboard inspirations and identify the emerging design themes:\n\n${summaries}` }],

@@ -218,7 +218,8 @@ export interface ProjectState {
 
 export interface PendingQuoteContext {
   documentId: string;
-  objectPath: string;
+  /** Optional: unknown when retrying extraction from a message action. */
+  objectPath?: string;
   fileName?: string;
   classification?: any;
   extractedData?: {

@@ -200,7 +200,7 @@ export async function getQuotesLinkedViaSourceDocuments(
     ? await db.select().from(quoteMetadata)
         .where(and(inArray(quoteMetadata.quoteVersionId, versionIds), eq(quoteMetadata.userId, userId)))
     : [];
-  const metaMap = new Map(metadataRows.map(m => [m.quoteVersionId, m.reference || '']));
+  const metaMap = new Map(metadataRows.map(m => [m.quoteVersionId, m.quoteNumber || '']));
 
   const quoteMap = new Map(linkedQuotes.map(q => [q.id, metaMap.get(q.legacyVersionId || '') || '']));
 

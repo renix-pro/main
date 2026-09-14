@@ -1536,7 +1536,7 @@ export function registerAiRoutes(app: Express): void {
                   const metadata = await storage.getQuoteMetadataByVersion(lookupId, user.id);
                   return {
                     id: q.id,
-                    reference: metadata?.reference || '',
+                    reference: metadata?.quoteNumber || '',
                     vendorName: snapshot?.name || (q.vendorId ? vendorMap.get(q.vendorId) || null : null),
                     total: fin?.grossAmount != null ? fin.grossAmount / 100 : null,
                     versionNumber: q.versionNumber || 1,

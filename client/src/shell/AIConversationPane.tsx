@@ -1313,7 +1313,7 @@ export function AIConversationPane({
               riskLevel: proposal.risk_level || 'low',
               provenance: proposal.provenance,
               author: proposal.author || 'AI',
-              model: proposal.model || 'claude-opus-5',
+              model: proposal.model || 'gpt-4o',
             }),
           });
           

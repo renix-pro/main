@@ -1,10 +1,32 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getAuthHeaders } from "@/auth/AuthContext";
 
+/** Error carrying the server's parsed JSON body, so callers can read `code`. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly body: any,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+  /** True when the write was refused because the project is closed/read-only. */
+  get isProjectClosed() {
+    return this.status === 403 && this.body?.code === "PROJECT_CLOSED";
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let body: any = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, body?.message || `${res.status}: ${text}`, body);
   }
 }
 
@@ -46,6 +68,16 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+/**
+ * Surfaces mutation failures the user would otherwise never see. Wired to a
+ * toast in App.tsx; kept as a hook so this module stays UI-free.
+ */
+type MutationErrorHandler = (error: unknown) => void;
+let mutationErrorHandler: MutationErrorHandler | null = null;
+export function setMutationErrorHandler(handler: MutationErrorHandler | null) {
+  mutationErrorHandler = handler;
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -57,6 +89,9 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      onError: (error) => {
+        mutationErrorHandler?.(error);
+      },
     },
   },
 });

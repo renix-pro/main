@@ -18,7 +18,6 @@
     "setup": "npm run infra:up && npm run db:push -- --force && npm run db:seed && npm run storage:seed"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -84,6 +83,7 @@
     "nanoid": "^6.0.1",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.1",
+    "openai": "^7.15.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pdf-parse": "^2.4.5",

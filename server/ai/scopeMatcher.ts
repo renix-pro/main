@@ -6,7 +6,7 @@
  * to intelligently assign invoices to the most relevant scope.
  */
 
-import { completeJson } from './claude';
+import { completeJson } from './openai';
 import type { ScopeNode } from '@shared/schema';
 
 interface LineItem {

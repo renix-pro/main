@@ -86,11 +86,12 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many requests. Please slow down.' },
-  skip: (req) => req.path === '/api/auth/login' || req.path === '/api/auth/register',
+  skip: (req) => req.path === '/api/auth/login' || req.path === '/api/auth/register' || req.path === '/api/auth/signup',
 });
 
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/signup', registerLimiter);
 app.use('/api', apiLimiter);
 
 app.use(
@@ -173,6 +174,12 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  // Unmatched API paths must answer JSON 404, never the SPA's index.html
+  // (which the Vite/static catch-all below would otherwise return with 200).
+  app.use('/api', (req: Request, res: Response) => {
+    res.status(404).json({ message: `No API route for ${req.method} ${req.originalUrl}` });
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -203,6 +210,14 @@ app.use((req, res, next) => {
     }
   } catch (error) {
     log(`⚠ Object storage health check error: ${error instanceof Error ? error.message : 'Unknown error'}`, "storage");
+  }
+
+  // AI credential check: without OPENAI_API_KEY every AI feature fails at call
+  // time, so say it once at boot rather than per request.
+  if (!process.env.OPENAI_API_KEY) {
+    log('\u26a0 No OPENAI_API_KEY set. AI features (companion, document extraction, summaries, hero images) will fail until one is configured in .env.', 'ai');
+  } else {
+    log(`AI configured (model ${process.env.OPENAI_MODEL || 'gpt-4o'})`, 'ai');
   }
 
   // Phase 5A: Run background job recovery on startup

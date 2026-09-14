@@ -98,9 +98,6 @@ interface RetrievalLogEntry extends BaseLogEntry {
       budget_allocations: number;
       quote_financials: number;
       vendors: number;
-      interpretations: number;
-      claims: number;
-      semantic_matches: number;
     };
     reason_for_semantic: string | null;
     entity_references_count: number;
@@ -118,8 +115,6 @@ interface ConstraintLogEntry extends BaseLogEntry {
       document_count: number | null;
       budget_allocation_count: number | null;
       vendor_count: number | null;
-      interpretation_count: number | null;
-      claim_count: number | null;
     };
     constrained_entities_applied: boolean;
   };

@@ -612,7 +612,7 @@ export function QuoteDetailPanel({
     queryKey: ['scope-references', projectId, selectedVersion?.id],
     queryFn: async () => {
       if (!selectedVersion?.id) return [];
-      const response = await fetch(`/api/projects/${projectId}/quote-versions/${selectedVersion.id}/scope-references`, { credentials: 'include' });
+      const response = await fetch(`/api/projects/${projectId}/quote-versions/${selectedVersion.id}/scope-references`, { credentials: 'include', headers: { ...getAuthHeaders() } });
       if (!response.ok) throw new Error('Failed to fetch scope references');
       return response.json();
     },
@@ -632,18 +632,22 @@ export function QuoteDetailPanel({
   }, [scopeRefsQuery, selectedVersion?.id]);
 
   const addScopeRefMutation = useMutation({
-    mutationFn: async ({ rowId, scopeId, scopeItemId }: { rowId: string; scopeId: string; scopeItemId?: string }) => {
+    mutationFn: async ({ rowId, scopeId, scopeItemId, quoteVersionId }: { rowId: string; scopeId: string; scopeItemId?: string; quoteVersionId: string }) => {
       const response = await fetch(`/api/projects/${projectId}/native-rows/${rowId}/scope-references`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
         body: JSON.stringify({
+          quoteVersionId,
           scopeId,
           scopeItemId: scopeItemId || null,
           allocationPercentage: 100,
         }),
       });
-      if (!response.ok) throw new Error('Failed to add scope reference');
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to add scope reference');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -660,6 +664,7 @@ export function QuoteDetailPanel({
       const response = await fetch(`/api/projects/${projectId}/scope-references/${refId}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: { ...getAuthHeaders() },
       });
       if (!response.ok) throw new Error('Failed to remove scope reference');
     },
@@ -676,7 +681,7 @@ export function QuoteDetailPanel({
     mutationFn: async ({ refId, percentage }: { refId: string; percentage: number }) => {
       const response = await fetch(`/api/projects/${projectId}/scope-references/${refId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         credentials: 'include',
         body: JSON.stringify({ allocationPercentage: percentage }),
       });
@@ -709,7 +714,7 @@ export function QuoteDetailPanel({
 
   const handleAddScopeReference = useCallback(async (rowId: string, scopeId: string, scopeItemId?: string) => {
     if (isReadOnly || !selectedVersion?.id) return;
-    addScopeRefMutation.mutate({ rowId, scopeId, scopeItemId });
+    addScopeRefMutation.mutate({ rowId, scopeId, scopeItemId, quoteVersionId: selectedVersion.id });
   }, [addScopeRefMutation, selectedVersion?.id, isReadOnly]);
 
   const handleRemoveScopeReference = useCallback(async (refId: string) => {

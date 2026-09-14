@@ -14,7 +14,6 @@ import { useLocation, Redirect } from "wouter";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 let hasRestoredSession = false;
-let projectRouteHasLoaded = false;
 
 function ProjectWorkspaceWithAI({ children }: { children: ReactNode }) {
   const { projectName, activeFrame, lastMeaningfulUpdate, projectStatus, setActiveFrame } = useProject();
@@ -113,7 +112,7 @@ export function SessionRestoreRedirect() {
   const [, setLocation] = useLocation();
   
   const { data: projectIds, isFetched, isError } = useQuery<string[]>({
-    queryKey: ['/api/projects'],
+    queryKey: ['api', 'projects'],
     enabled: isAuthenticated,
     staleTime: 30000,
     select: (data: unknown): string[] => {
@@ -148,11 +147,16 @@ export function SessionRestoreRedirect() {
   return null;
 }
 
-export function ProjectRoute({ id, frame }: { id: string; frame: string }) {
-  const isDirectEntry = !projectRouteHasLoaded;
-  projectRouteHasLoaded = true;
+const CANONICAL_FRAMES = new Set([
+  'overview', 'vision', 'scope', 'budget', 'quotes',
+  'invoices', 'financing', 'execution', 'documents',
+]);
 
-  if (isDirectEntry && frame !== 'overview') {
+export function ProjectRoute({ id, frame }: { id: string; frame: string }) {
+
+  // Deep links and refreshes must land on the frame in the URL; only an
+  // unknown frame name falls back to Overview.
+  if (!CANONICAL_FRAMES.has(frame)) {
     return (
       <Redirect to={`/project/${id}/overview`} />
     );

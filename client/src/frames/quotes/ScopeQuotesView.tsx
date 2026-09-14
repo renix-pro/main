@@ -520,13 +520,13 @@ export function ScopeQuotesView({
 
   const { data: sourceDocsData } = useQuery({
     queryKey: ['api', 'projects', projectId, 'source-documents'],
-    queryFn: () => projectId ? quotesApi.getSourceDocuments(projectId) : Promise.resolve({ sourceDocuments: [] }),
+    queryFn: () => projectId ? quotesApi.getSourceDocuments(projectId) : Promise.resolve([]),
     enabled: !!projectId,
   });
 
   const allNativeRows: NativeQuoteRow[] = [];
   const allScopeRefs: ScopeQuoteRowReference[] = propScopeRefs || [];
-  const allSourceDocs = sourceDocsData?.sourceDocuments || [];
+  const allSourceDocs = sourceDocsData ?? [];
 
   const scopeSpecificRefs = useMemo(() => {
     return allScopeRefs.filter(ref => ref.scopeId === scopeId);

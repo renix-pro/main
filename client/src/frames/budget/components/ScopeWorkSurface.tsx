@@ -61,10 +61,6 @@ export function ScopeWorkSurface({
     switch (target.type) {
       case 'scope':
         return 'Scope';
-      case 'area':
-        return 'Area';
-      case 'item':
-        return 'Item';
       case 'contingency':
         return 'Contingency';
       case 'unassigned':

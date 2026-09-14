@@ -12,7 +12,7 @@ the old `replit.md` (kept until you delete it; its content lives here now).
 
 ### First-time setup
 ```bash
-cp .env.example .env        # already done once; fill in ANTHROPIC_API_KEY etc.
+cp .env.example .env        # already done once; fill in OPENAI_API_KEY etc.
 npm install
 npm run setup               # docker compose up, drizzle push, load seed SQL, seed storage
 npm run dev                 # http://localhost:4000
@@ -40,10 +40,10 @@ run the individual steps if you only need one.
 - `GCS_EMULATOR_URL`, `PRIVATE_OBJECT_DIR=/renix-local/.private`, `PUBLIC_OBJECT_SEARCH_PATHS` — object storage.
   Do NOT rename `GCS_EMULATOR_URL` to `STORAGE_EMULATOR_HOST`: the Google client library
   special-cases that name and breaks the URL.
-- `ANTHROPIC_API_KEY` — Claude credentials, read directly by `@anthropic-ai/sdk`. Alternatives the SDK
-  also accepts: `ANTHROPIC_AUTH_TOKEN`, or a profile from `ant auth login` (Anthropic CLI). Without any of
-  these the app runs but every AI feature returns an error on use.
-- `CLAUDE_MODEL` — optional, defaults to `claude-opus-5`.
+- `OPENAI_API_KEY` — required for every AI feature. Optional overrides: `OPENAI_MODEL` (default `gpt-4o`),
+  `OPENAI_MODEL_FAST` (default `gpt-4o-mini`), `OPENAI_WEB_SEARCH_MODEL`, `OPENAI_IMAGE_MODEL`
+  (default `gpt-image-1`), `OPENAI_BASE_URL` (only for a proxy). Without a key the app runs but every AI
+  feature errors on use; the server logs a warning at boot.
 - `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` — Google Sign-In. Add `http://localhost:4000`
   to the OAuth client's authorized JavaScript origins in Google Cloud Console.
 - `SMTP_USER`, `SMTP_APP_PASSWORD`, `SMTP_FROM_NAME` — password-reset mail (optional).
@@ -57,33 +57,31 @@ run the individual steps if you only need one.
 - `docker-compose.yml`, `.env.example`, `scripts/seed-storage.cjs`, `.claude/launch.json` are new.
 - The `server/replit_integrations/` folder name was kept to avoid touching ~15 import sites; only `object_storage/` and `document/` remain (the Replit voice, chat, image and batch helpers were deleted).
 
-### AI provider: Claude (switched from OpenAI on 2026-09-14)
-- All LLM calls go through `server/ai/claude.ts`: `completeText`, `completeJson`, `streamText`,
-  `streamJson`, `webResearch`, plus `imageBlock`/`pdfBlock` for vision input and `parseJsonLoose`.
-  Do not instantiate the SDK anywhere else.
-- Model is `claude-opus-5` (`CLAUDE_MODEL`); adaptive thinking is on by default. Light tasks
-  (classification, summaries, scope matching, themes, quote insights, overview text) pass
-  `effort: "low"`; extraction and the companion chat use the default effort.
-- JSON responses: prompts already demand JSON and `completeJson` appends a JSON-only rule and parses
-  leniently (code fences / surrounding prose tolerated). Zod validation of the parsed shape is unchanged.
-  Structured outputs (`output_config.format` with `zodOutputFormat`) are a possible hardening step later.
-- Web research for cost-validation questions uses Claude's server-side `web_search_20260209` tool
-  (replaced OpenAI's Responses API web search).
-- Refusal handling: a `stop_reason: "refusal"` throws `ClaudeRefusalError`; server-side fallbacks are
-  not enabled.
-- Hero images: Claude cannot render raster images, so `server/ai/heroIllustration.ts` has it author an SVG
-  illustration instead (1024x576, RENIX palette, no text). The SVG is sanitized (scripts, styles, images,
-  links, event handlers, external refs removed) and stored as `image/svg+xml` at
-  `projects/<id>/hero-<timestamp>.svg`; the client `<img>` renders it unchanged. Runs in the background on
-  project create and on `POST /api/projects/:id/hero-image/generate` (502 if generation fails).
-- Not ported: the unused Replit voice/transcription module (deleted).
-- Live calls were not exercised during the port because no Anthropic credential was present on this machine.
+### AI provider: OpenAI
+- All LLM calls go through `server/ai/openai.ts`: `completeText`, `completeJson`, `streamText`,
+  `streamJson`, `webResearch`, `generateImageBuffer`, plus `imageBlock` for vision input and
+  `parseJsonLoose`. Do not instantiate the SDK anywhere else.
+- Models: `gpt-4o` for extraction and the AI companion, `gpt-4o-mini` for classification, summaries,
+  scope matching, overview text and quote insights. Call sites choose via `effort: "low"` rather than
+  naming models. All overridable by env var.
+- JSON responses use OpenAI's native JSON mode plus a lenient parser (`parseJsonLoose`) that tolerates
+  code fences and surrounding prose. Zod validation of the parsed shape is unchanged.
+- Web research for cost-validation questions uses the Responses API `web_search` tool.
+- Project hero images are generated with `gpt-image-1` and stored as PNG at
+  `projects/<id>/hero-<timestamp>.png`; generation runs in the background on project create and on
+  `POST /api/projects/:id/hero-image/generate`.
+- History: the project was briefly ported to Anthropic Claude on 2026-09-14 and reverted to OpenAI the
+  same day. The Claude-only modules (`server/ai/claude.ts`, `server/ai/heroIllustration.ts`) were removed.
 
 ### Known issues / follow-ups
-- `npm run check` reports 73 pre-existing TypeScript errors (84 before migration, 81 before the Claude port). The dev server
-  (tsx) and the esbuild production build don't type-check, so the app runs. Biggest clusters:
-  `server/documentProcessor.ts` (23, calls storage methods that no longer exist),
-  `client/src/frames/quotes/useQuotesModeState.ts` (21), the remaining pre-existing ones are in `server/routes/ai.ts`, `server/storage/*.ts` and client hooks.
+- `npm run check` is clean (0 errors). It was 84 at import from Replit; the 2026-09-14 audit fixed the
+  real ones and removed three dead modules (`server/documentProcessor.ts`, `client/src/cfi/`,
+  `client/src/frames/quotes/useQuotesModeState.ts`).
+- Audit of 2026-09-14: `docs/audit-2026-09-14.md` (runtime + fixes) with appendices `docs/audit-2026-09-14-api-wiring.md`
+  and `docs/audit-2026-09-14-code-health.md`. Open medium/low items are listed there (silent UI failures on closed
+  projects, missing `scope-references`/`annotations` routes, proposals polling, etc.).
+- Security-relevant behaviour after the audit: `GET /objects/*` requires login + ownership; unknown `/api/*` paths
+  return JSON 404; project PATCH is whitelisted; document extraction routes require auth.
 - Deploying anywhere other than Replit needs a real storage backend: set `GOOGLE_APPLICATION_CREDENTIALS`
   and replace the sidecar credential block + `signObjectURL` with `file.getSignedUrl()`.
 - Leftover Replit files on disk, all gitignored and safe to delete: `replit.md`, `.replit`, `.local/`, `.agents/`,
@@ -94,7 +92,8 @@ run the individual steps if you only need one.
   `attached_assets/` except the handful of images the client imports.
   Keep local copies of these outside git (e.g. the Replit export zip) — a fresh clone can only use `npm run db:seed-demo`.
 - Git history was restarted on 2026-09-14 with a single clean commit for the same reason; the original Replit
-  history exists only locally on the `replit-history` branch. Never push that branch to the public remote.
+  history was purged from this clone entirely (branches, Replit's `refs/replit/agent-ledger`, reflog, gc).
+  The only remaining copy is the Replit export zip — keep it private.
 - Seeded users have passwords from the old system (bcrypt or legacy SHA-256; both still work). Register a new account for local testing.
 
 ## User Preferences
@@ -163,4 +162,4 @@ Forgot password flow: user enters email on `/reset-password` → backend generat
 - **Framer Motion**: JavaScript animation library for React (workspace UI only; landing page and legal pages use CSS animations).
 - **Zod**: TypeScript-first schema declaration and validation library.
 - **Express**: Fast, unopinionated, minimalist web framework for Node.js.
-- **Claude (Anthropic SDK)**: AI Companion, document classification/extraction, summaries, overview interpretations, quote insights, web research (`claude-opus-5`).
+- **OpenAI**: AI Companion, document classification/extraction, summaries, overview interpretations, quote insights, web research (`gpt-4o` / `gpt-4o-mini`) and project hero images (`gpt-image-1`).

@@ -16,15 +16,16 @@
  * - Collapsible AI and Navigation panes
  */
 
-import { queryClient } from "./lib/queryClient";
+import { queryClient, setMutationErrorHandler, ApiError } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider, ProtectedRoute, AuthRoute } from "./auth";
 
 import { Switch, Route, Redirect } from "wouter";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RenixLoader } from "@/components/RenixLoader";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -168,6 +169,41 @@ function Router() {
   );
 }
 
+/**
+ * Turns failed mutations into a toast. Without this, a rejected write (most
+ * visibly a 403 on a closed, read-only project) failed silently and the UI
+ * looked as though the change had been saved.
+ */
+function MutationErrorToaster() {
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setMutationErrorHandler((error) => {
+      if (error instanceof ApiError && error.isProjectClosed) {
+        toast({
+          title: 'Project is closed',
+          description: 'This project is read-only. Reopen it to make changes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        toast({
+          title: 'Signed out',
+          description: 'Your session expired. Please sign in again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const description = error instanceof Error ? error.message : 'Something went wrong.';
+      toast({ title: "Couldn't save changes", description, variant: 'destructive' });
+    });
+    return () => setMutationErrorHandler(null);
+  }, [toast]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -178,6 +214,7 @@ function App() {
             <AuthProvider>
               <Router />
             </AuthProvider>
+            <MutationErrorToaster />
             <Toaster />
             <CookieConsent />
           </div>

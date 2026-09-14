@@ -3,7 +3,7 @@ import { ObjectStorageService } from "./replit_integrations/object_storage/objec
 import { db } from "./db";
 import { documents } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { completeText } from "./ai/claude";
+import { completeText } from "./ai/openai";
 
 const MAX_EXTRACTED_TEXT_LENGTH = 50000;
 

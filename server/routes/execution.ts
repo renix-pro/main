@@ -40,7 +40,36 @@ export function registerExecutionRoutes(app: Express): void {
         overdue: !!(task.plannedEnd && task.status !== 'done' && now > task.plannedEnd),
         notStarted: !!(task.plannedStart && task.status === 'to_do' && now >= task.plannedStart),
       }));
-      return res.json({ tasks: enrichedTasks });
+
+      // There is no task-history table; the activity log is derived from the
+      // timestamps each task carries, so it reflects real data only.
+      const log = tasks.flatMap(task => {
+        const entries: Array<{ id: string; taskId: string; action: string; previousValue: string | null; newValue: string | null; timestamp: string; actor: string }> = [
+          {
+            id: `${task.id}-created`,
+            taskId: task.id,
+            action: 'created',
+            previousValue: null,
+            newValue: task.label,
+            timestamp: task.createdAt.toISOString(),
+            actor: 'You',
+          },
+        ];
+        if (task.updatedAt && task.updatedAt.getTime() - task.createdAt.getTime() > 1000) {
+          entries.push({
+            id: `${task.id}-updated`,
+            taskId: task.id,
+            action: 'last updated',
+            previousValue: null,
+            newValue: task.status,
+            timestamp: task.updatedAt.toISOString(),
+            actor: 'You',
+          });
+        }
+        return entries;
+      });
+
+      return res.json({ tasks: enrichedTasks, log });
     } catch (error) {
       console.error('Error fetching execution:', error);
       return res.status(500).json({ message: 'Internal server error' });

@@ -33,7 +33,7 @@ const VALID_STATE_TRANSITIONS: Record<string, string[]> = {
 };
 
 function findActiveSession(projectId: string, scopeId: string, userId: string): ImportSession | null {
-  for (const session of sessions.values()) {
+  for (const session of Array.from(sessions.values())) {
     if (
       session.projectId === projectId &&
       session.scopeId === scopeId &&

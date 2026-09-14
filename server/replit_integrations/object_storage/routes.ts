@@ -8,7 +8,43 @@ import {
   LOCAL_UPLOAD_PREFIX,
 } from "./objectStorage";
 import { storage } from "../../storage";
+import { db } from "../../db";
+import { documents, sourceDocuments, pendingUploads, projects } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+
+/**
+ * Authorization for serving stored objects.
+ *
+ * - Project-scoped paths (/objects/projects/<projectId>/...) are readable by the
+ *   project owner and project members.
+ * - Legacy shared paths (/objects/uploads/<id>) are readable only if a record
+ *   owned by the user references that exact path (document, source document,
+ *   pending upload, or project hero image).
+ */
+async function canUserAccessObjectPath(userId: string, objectPath: string): Promise<boolean> {
+  const projectMatch = objectPath.match(/^\/objects\/projects\/([^/]+)\//);
+  if (projectMatch) {
+    const project = await storage.getProjectByIdOnly(projectMatch[1]);
+    if (!project) return false;
+    if (project.userId === userId) return true;
+    const members = Array.isArray(project.members) ? (project.members as Array<unknown>) : [];
+    return members.some((m) => !!m && typeof m === "object" && (m as { userId?: string }).userId === userId);
+  }
+
+  const [doc] = await db.select({ id: documents.id }).from(documents)
+    .where(and(eq(documents.userId, userId), eq(documents.fileDataUrl, objectPath))).limit(1);
+  if (doc) return true;
+  const [src] = await db.select({ id: sourceDocuments.id }).from(sourceDocuments)
+    .where(and(eq(sourceDocuments.userId, userId), eq(sourceDocuments.objectStoragePath, objectPath))).limit(1);
+  if (src) return true;
+  const [pending] = await db.select({ token: pendingUploads.token }).from(pendingUploads)
+    .where(and(eq(pendingUploads.userId, userId), eq(pendingUploads.objectPath, objectPath))).limit(1);
+  if (pending) return true;
+  const [hero] = await db.select({ id: projects.id }).from(projects)
+    .where(and(eq(projects.userId, userId), eq(projects.heroImagePath, objectPath))).limit(1);
+  return !!hero;
+}
 
 type AuthMiddleware = (req: Request, res: Response, next: NextFunction) => void;
 
@@ -194,11 +230,19 @@ export function registerObjectStorageRoutes(app: Express, requireAuth?: AuthMidd
    *
    * GET /objects/:objectPath(*)
    *
-   * This serves files from object storage. For public files, no auth needed.
-   * For protected files, add authentication middleware and ACL checks.
+   * Requires an authenticated user (session cookie or bearer token) who owns
+   * or is a member of the project the object belongs to. Unknown or foreign
+   * paths answer 404 so object existence is not leaked.
    */
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  const denyUnauthenticated: AuthMiddleware = (_req, res) => {
+    res.status(401).json({ error: "Authentication required" });
+  };
+  app.get("/objects/:objectPath(*)", requireAuth ?? denyUnauthenticated, async (req, res) => {
     try {
+      const user = (req as any).user;
+      if (!user?.id || !(await canUserAccessObjectPath(user.id, req.path))) {
+        return res.status(404).json({ error: "This file is no longer available. It may need to be re-uploaded." });
+      }
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error) {

@@ -157,7 +157,7 @@ export function OnboardingTour({ onComplete }: { onComplete?: () => void } = {})
     const unsub = onTourReactivate(() => {
       tryStartTour();
     });
-    return unsub;
+    return () => { unsub(); };
   }, [tryStartTour]);
 
   const positionTooltip = useCallback(() => {

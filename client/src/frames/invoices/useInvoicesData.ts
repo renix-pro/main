@@ -523,6 +523,7 @@ export function useInvoicesData(projectId: string, isReadOnly: boolean): UseInvo
       action: 'delete',
       entityType: 'payment',
       getEntityId: (params) => params.paymentId,
+      getTitle: () => 'Delete Payment',
       getDescription: () => `Delete payment record`,
     }),
   });

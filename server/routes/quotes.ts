@@ -34,6 +34,7 @@ import {
   vendorSnapshots,
   budgetAllocations,
   projects,
+  quoteScopeReferences,
 } from "@shared/schema";
 import {
   requireAuth,
@@ -42,8 +43,8 @@ import {
 } from "./shared/middleware";
 import { invalidateOverviewCache } from './overview';
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
-import { completeText, parseJsonLoose, CLAUDE_MODEL } from "../ai/claude";
+import { eq, and, sql, asc, inArray } from "drizzle-orm";
+import { completeText, parseJsonLoose, OPENAI_MODEL } from "../ai/openai";
 
 export function registerQuotesRoutes(app: Express): void {
   // ============================================
@@ -470,6 +471,21 @@ export function registerQuotesRoutes(app: Express): void {
       // Validate that the document has required fields
       if (!existingDoc.fileName) {
         return res.status(400).json({ message: 'Document is missing required fileName' });
+      }
+
+      // A quote cannot exist without its source document, so the file must
+      // actually be present in object storage before we create quote rows.
+      if (!existingDoc.fileDataUrl) {
+        return res.status(400).json({ message: 'Document has no stored file. Re-upload it before creating a quote.' });
+      }
+      try {
+        const objectStorage = new ObjectStorageService();
+        await objectStorage.getObjectEntityFile(existingDoc.fileDataUrl);
+      } catch (storageError) {
+        console.error('[Quotes] Source file missing for document', documentId, storageError);
+        return res.status(409).json({
+          message: 'The stored file for this document is no longer available. Re-upload it before creating a quote.',
+        });
       }
 
       // Create source document record that links to the existing document
@@ -1585,7 +1601,7 @@ export function registerQuotesRoutes(app: Express): void {
         });
       }
 
-      const model = CLAUDE_MODEL;
+      const model = OPENAI_MODEL;
 
       const assessment = await completeText({
         system: `You are a construction project financial analyst. Write exactly 2-3 sentences as a single paragraph. Use markdown **bold** for key figures and terms. Cover the most relevant of: budget alignment (% over/under), competitive position (if sibling quotes exist), line item clarity concerns (vague lump-sum items), validity/expiry status. Be observational, never prescriptive — state facts, never give advice. Use the currency symbol: ${currencySymbol}`,
@@ -1676,6 +1692,163 @@ ${itemList || '  (no line items)'}`;
       return res.json({ insights });
     } catch (error) {
       console.error('Error generating quote comparison insight:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // ============================================
+  // SCOPE REFERENCES (allocate native quote rows to scopes)
+  // ============================================
+
+  /** All scope references for a quote version. */
+  app.get('/api/projects/:projectId/quote-versions/:versionId/scope-references', requireAuth, requireProjectAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, versionId } = req.params;
+      const rows = await db.select().from(quoteScopeReferences)
+        .where(and(
+          eq(quoteScopeReferences.quoteVersionId, versionId),
+          eq(quoteScopeReferences.projectId, projectId),
+          eq(quoteScopeReferences.userId, user.id),
+        ))
+        .orderBy(asc(quoteScopeReferences.createdAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error('Error fetching scope references:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  /**
+   * Allocate one native quote row to a scope.
+   * Body: { quoteVersionId, scopeId, scopeItemId?, allocationPercentage? }
+   */
+  app.post('/api/projects/:projectId/native-rows/:rowId/scope-references', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, rowId } = req.params;
+      const { quoteVersionId, scopeId, scopeItemId, allocationPercentage } = req.body || {};
+
+      if (!quoteVersionId || typeof quoteVersionId !== 'string') {
+        return res.status(400).json({ message: 'quoteVersionId is required' });
+      }
+      if (!scopeId || typeof scopeId !== 'string') {
+        return res.status(400).json({ message: 'scopeId is required' });
+      }
+
+      const percentage = allocationPercentage == null ? 100 : Number(allocationPercentage);
+      if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+        return res.status(400).json({ message: 'allocationPercentage must be between 1 and 100' });
+      }
+
+      const scopeNode = await storage.getScopeNodeById(scopeId, user.id);
+      if (!scopeNode || scopeNode.projectId !== projectId) {
+        return res.status(404).json({ message: 'Scope not found in this project' });
+      }
+
+      const existing = await db.select().from(quoteScopeReferences)
+        .where(and(
+          eq(quoteScopeReferences.quoteVersionId, quoteVersionId),
+          eq(quoteScopeReferences.nativeQuoteRowId, rowId),
+          eq(quoteScopeReferences.userId, user.id),
+        ));
+
+      if (existing.some(ref => ref.scopeId === scopeId && (ref.scopeItemId ?? null) === (scopeItemId ?? null))) {
+        return res.status(409).json({ message: 'This row is already allocated to that scope' });
+      }
+
+      const allocated = existing.reduce((sum, ref) => sum + ref.allocationPercentage, 0);
+      if (allocated + percentage > 100) {
+        return res.status(400).json({
+          message: `Row is already ${allocated}% allocated; ${100 - allocated}% remains`,
+          allocated,
+        });
+      }
+
+      const [created] = await db.insert(quoteScopeReferences).values({
+        quoteVersionId,
+        nativeQuoteRowId: rowId,
+        projectId,
+        userId: user.id,
+        scopeId,
+        scopeAreaId: null,
+        scopeItemId: scopeItemId || null,
+        allocationPercentage: Math.round(percentage),
+      }).returning();
+
+      return res.status(201).json(created);
+    } catch (error) {
+      console.error('Error creating scope reference:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  /** Change the allocation percentage of one scope reference. */
+  app.patch('/api/projects/:projectId/scope-references/:refId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, refId } = req.params;
+      const percentage = Number(req.body?.allocationPercentage);
+      if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+        return res.status(400).json({ message: 'allocationPercentage must be between 1 and 100' });
+      }
+
+      const [ref] = await db.select().from(quoteScopeReferences)
+        .where(and(
+          eq(quoteScopeReferences.id, refId),
+          eq(quoteScopeReferences.projectId, projectId),
+          eq(quoteScopeReferences.userId, user.id),
+        )).limit(1);
+      if (!ref) {
+        return res.status(404).json({ message: 'Scope reference not found' });
+      }
+
+      const siblings = await db.select().from(quoteScopeReferences)
+        .where(and(
+          eq(quoteScopeReferences.quoteVersionId, ref.quoteVersionId),
+          eq(quoteScopeReferences.nativeQuoteRowId, ref.nativeQuoteRowId),
+          eq(quoteScopeReferences.userId, user.id),
+        ));
+      const otherTotal = siblings
+        .filter(s => s.id !== refId)
+        .reduce((sum, s) => sum + s.allocationPercentage, 0);
+      if (otherTotal + percentage > 100) {
+        return res.status(400).json({
+          message: `Other allocations for this row already use ${otherTotal}%; at most ${100 - otherTotal}% is available`,
+          allocated: otherTotal,
+        });
+      }
+
+      const [updated] = await db.update(quoteScopeReferences)
+        .set({ allocationPercentage: Math.round(percentage), updatedAt: new Date() })
+        .where(eq(quoteScopeReferences.id, refId))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error('Error updating scope reference:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  /** Remove a scope allocation from a native quote row. */
+  app.delete('/api/projects/:projectId/scope-references/:refId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, refId } = req.params;
+      const deleted = await db.delete(quoteScopeReferences)
+        .where(and(
+          eq(quoteScopeReferences.id, refId),
+          eq(quoteScopeReferences.projectId, projectId),
+          eq(quoteScopeReferences.userId, user.id),
+        ))
+        .returning();
+      if (deleted.length === 0) {
+        return res.status(404).json({ message: 'Scope reference not found' });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting scope reference:', error);
       return res.status(500).json({ message: 'Internal server error' });
     }
   });

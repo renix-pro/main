@@ -230,6 +230,10 @@ export interface AuthoritativeState {
       totalTax: number | null;
       quoteDate: string | null;
       lineItemCount: number;
+      versionNumber: number | null;
+      commitmentStatus: string | null;
+      extractionStatus: string | null;
+      previousQuoteId: string | null;
       topLineItems: Array<{
         description: string;
         totalPrice: number | null;

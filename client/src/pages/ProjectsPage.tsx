@@ -551,7 +551,7 @@ interface ProjectCardProps {
 
 function ProjectCard({ project, summary, isNew, onEnter, onOpenSettings }: ProjectCardProps) {
   const colorValue = getColorValue(project.color);
-  const regionMatch = SUPPORTED_REGIONS.find(r => r.id === project.regionalContext?.region || r.label === project.regionalContext?.region);
+  const regionMatch = SUPPORTED_REGIONS.find(r => r.id === project.regionalContext?.region);
   const regionLabel = regionMatch?.label || project.regionalContext?.region;
   const lastActivity = project.updatedAt || project.createdAt;
   const currency = project.regionalContext?.currency;

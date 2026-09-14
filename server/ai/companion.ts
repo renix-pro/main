@@ -1,14 +1,13 @@
 /**
- * RENIX vNext — AI Companion (Claude)
+ * RENIX vNext — AI Companion (OpenAI)
  *
  * Message processing and streaming logic for the AI companion, on top of the
- * shared Claude client in ./claude. Handles both streaming and non-streaming
+ * shared OpenAI client in ./openai. Handles both streaming and non-streaming
  * responses. Preserves proposal gating logic.
  */
 
-import type Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "crypto";
-import { completeText, streamText, webResearch, parseJsonLoose, CLAUDE_MODEL, JSON_ONLY_RULE } from "./claude";
+import { completeText, streamText, webResearch, parseJsonLoose, OPENAI_MODEL, JSON_ONLY_RULE, type ChatMessage } from "./openai";
 import { retrieveRelevantChunks, retrieveDocumentByNameFallback, formatChunksForContext } from './ragPipeline';
 
 const CURRENCY_SYMBOL_MAP: Record<string, string> = {
@@ -35,8 +34,8 @@ import { getSystemPrompt, AI_SYSTEM_RULE } from './prompts';
 import { buildAIContext, serializeContextForAI } from './service';
 import { serializeContextForAIWithAudit } from './contextAssembly';
 
-/** Last 10 user/assistant turns as Claude message params. */
-function toClaudeHistory(history: AIMessage[]): Anthropic.MessageParam[] {
+/** Last 10 user/assistant turns as chat message params. */
+function toChatHistory(history: AIMessage[]): ChatMessage[] {
   return history
     .filter((m) => m.role === 'user' || m.role === 'assistant')
     .slice(-10)
@@ -106,7 +105,7 @@ async function performWebResearch(userMessage: string, context: ProjectContext):
     
     const outputText = await webResearch(
       `Research current market rates and typical pricing for the following construction/renovation work. Provide specific price ranges per unit where possible. Be factual and cite sources.\n\nUser question: ${redactPII(userMessage)}\n\nSearch focus: ${searchQuery}`,
-      { maxUses: 5, effort: 'medium' },
+      {},
     );
     if (outputText) {
       console.log(`[AI WebSearch] Web research completed (${outputText.length} chars)`);
@@ -126,7 +125,7 @@ export async function processUserMessage(
 ): Promise<AIResponse> {
   const requestId = randomUUID();
   const startTime = Date.now();
-  const model = CLAUDE_MODEL;
+  const model = OPENAI_MODEL;
   const temperature = 0.3;
   
   const contextSnapshot = JSON.stringify({
@@ -308,8 +307,8 @@ ${webData}`;
       webResearchContext,
       JSON_ONLY_RULE,
     ];
-    const messages: Anthropic.MessageParam[] = [
-      ...toClaudeHistory(conversationHistory),
+    const messages: ChatMessage[] = [
+      ...toChatHistory(conversationHistory),
       { role: 'user', content: userMessage },
     ];
 
@@ -387,7 +386,7 @@ export async function streamProcessUserMessage(
 ): Promise<AIResponse> {
   const requestId = randomUUID();
   const startTime = Date.now();
-  const model = CLAUDE_MODEL;
+  const model = OPENAI_MODEL;
   const temperature = 0.3;
   
   const contextSnapshot = JSON.stringify({
@@ -441,8 +440,8 @@ export async function streamProcessUserMessage(
       ragContext ? `DOCUMENT KNOWLEDGE (retrieved from uploaded project documents — use these passages to answer user questions about document content):\n${ragContext}` : '',
       JSON_ONLY_RULE,
     ];
-    const messages: Anthropic.MessageParam[] = [
-      ...toClaudeHistory(conversationHistory),
+    const messages: ChatMessage[] = [
+      ...toChatHistory(conversationHistory),
       { role: 'user', content: userMessage },
     ];
 

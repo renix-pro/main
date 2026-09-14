@@ -58,9 +58,7 @@ export function AllocationMap({
   const unassignedAllocations = useMemo(() => {
     return allocations.filter(a => 
       a.target.type === 'unassigned' || 
-      (a.target.type === 'scope' && !a.target.scopeId) ||
-      a.target.type === 'area' ||
-      a.target.type === 'item'
+      (a.target.type === 'scope' && !a.target.scopeId)
     );
   }, [allocations]);
 

@@ -383,8 +383,9 @@ export const quotesApi = {
   updateVersion: (projectId: string, versionId: string, data: Partial<QuoteVersion>) => 
     patchJson<QuoteVersion>(`/api/projects/${projectId}/quote-versions/${versionId}`, data),
   // Source Documents
+  // The server returns a bare array (routes/quotes.ts GET /source-documents).
   getSourceDocuments: (projectId: string) => 
-    fetchJson<{ sourceDocuments: SourceDocument[] }>(`/api/projects/${projectId}/source-documents`),
+    fetchJson<SourceDocument[]>(`/api/projects/${projectId}/source-documents`),
   createSourceDocument: (projectId: string, data: Partial<SourceDocument>) => 
     postJson<SourceDocument>(`/api/projects/${projectId}/source-documents`, data),
   deleteSourceDocument: (projectId: string, docId: string) => 
@@ -654,8 +655,19 @@ export interface ExecutionTask {
   notStarted: boolean;
 }
 
+export interface ExecutionLog {
+  id: string;
+  taskId: string;
+  action: string;
+  previousValue: string | null;
+  newValue: string | null;
+  timestamp: string;
+  actor: string;
+}
+
 export interface ExecutionResponse {
   tasks: ExecutionTask[];
+  log?: ExecutionLog[];
 }
 
 export interface TaskAggregatesResponse {

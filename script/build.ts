@@ -20,7 +20,7 @@ const allowlist = [
   "multer",
   "nanoid",
   "nodemailer",
-  "@anthropic-ai/sdk",
+  "openai",
   "passport",
   "passport-local",
   "pg",

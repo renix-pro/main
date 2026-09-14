@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { completeJson } from "../ai/claude";
+import { completeJson } from "../ai/openai";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { eq } from "drizzle-orm";

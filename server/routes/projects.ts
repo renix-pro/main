@@ -7,7 +7,8 @@
 
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
-import { insertProjectSchema } from "@shared/schema";
+import { z } from "zod";
+import { insertProjectSchema, type InsertProject } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { invalidateOverviewCache } from './overview';
 import { db } from "../db";
@@ -18,14 +19,14 @@ import {
   requireWriteAccess,
 } from "./shared/middleware";
 import { ObjectStorageService } from "../replit_integrations/object_storage/objectStorage";
-import { generateHeroSvg } from "../ai/heroIllustration";
+import { generateImageBuffer } from "../ai/openai";
 
 const objectStorageService = new ObjectStorageService();
 
 /**
- * Generate a Claude-authored SVG hero illustration for a project, store it in
- * object storage and record its path on the project. Returns the object path,
- * or null if generation failed (the project keeps its previous/default hero).
+ * Generate an AI hero image for a project, store it in object storage and
+ * record its path on the project. Returns the object path, or null if
+ * generation failed (the project keeps its previous/default hero).
  */
 async function generateAndStoreHeroImage(
   projectId: string,
@@ -35,12 +36,16 @@ async function generateAndStoreHeroImage(
   previousHeroPath?: string | null,
 ): Promise<string | null> {
   try {
-    const svg = await generateHeroSvg({ projectName, projectType, projectDescription });
+    const typeLabel = projectType || 'renovation';
+    const desc = projectDescription ? ` ${projectDescription}` : '';
+    const prompt = `Soft architectural watercolor illustration of a ${typeLabel} project: ${projectName}.${desc} Minimal, elegant, muted warm tones with hints of copper and sage. No text, no people, no words, no letters, wide landscape composition. Dreamy, aspirational, premium feel.`;
+
+    const buffer = await generateImageBuffer(prompt, '1024x1024');
 
     const privateDir = objectStorageService.getPrivateObjectDir();
     // Unique name per generation so browsers never show a stale cached hero.
-    const storagePath = `${privateDir}/projects/${projectId}/hero-${Date.now()}.svg`;
-    const normalizedPath = await objectStorageService.uploadBuffer(Buffer.from(svg, 'utf8'), storagePath, 'image/svg+xml');
+    const storagePath = `${privateDir}/projects/${projectId}/hero-${Date.now()}.png`;
+    const normalizedPath = await objectStorageService.uploadBuffer(buffer, storagePath, 'image/png');
 
     await db.update(schema.projects)
       .set({ heroImagePath: normalizedPath, updatedAt: new Date() })
@@ -50,10 +55,10 @@ async function generateAndStoreHeroImage(
       objectStorageService.deleteObjectEntity(previousHeroPath).catch(() => {});
     }
 
-    console.log(`[HeroImage] Generated SVG hero illustration for project ${projectId} (${svg.length} chars)`);
+    console.log(`[HeroImage] Generated hero image for project ${projectId} (${buffer.length} bytes)`);
     return normalizedPath;
   } catch (error) {
-    console.error(`[HeroImage] Failed to generate hero illustration for project ${projectId}:`, error);
+    console.error(`[HeroImage] Failed to generate hero image for project ${projectId}:`, error);
     return null;
   }
 }
@@ -238,7 +243,7 @@ export function registerProjectRoutes(app: Express): void {
       }
       const project = await storage.createProject(parsed.data);
 
-      // Fire-and-forget: Claude draws an SVG hero illustration in the background.
+      // Fire-and-forget: the hero image is generated in the background.
       generateAndStoreHeroImage(
         project.id,
         parsed.data.name,
@@ -253,11 +258,38 @@ export function registerProjectRoutes(app: Express): void {
     }
   });
 
+  const PROJECT_STATUSES = ['open', 'closed', 'archived'] as const;
+  const projectPatchSchema = z.object({
+    name: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(5000).nullable().optional(),
+    type: z.string().max(100).nullable().optional(),
+    color: z.string().max(32).optional(),
+    status: z.enum(PROJECT_STATUSES).optional(),
+    regionalContext: z.record(z.unknown()).optional(),
+  }).strict();
+
   app.patch('/api/projects/:projectId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { projectId } = req.params;
-      const project = await storage.updateProject(projectId, user.id, req.body);
+
+      // Only user-editable fields may be patched (no mass assignment of
+      // userId, lifecycleState, heroImagePath, ...).
+      const parsed = projectPatchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: 'Invalid data', errors: parsed.error.errors });
+      }
+      const updates = parsed.data;
+
+      // The client closes a project with { status: 'closed' }. Keep the server
+      // lifecycle in sync so read-only enforcement actually engages.
+      // (requireWriteAccess already rejects patches on closed projects, so
+      // closed → open cannot happen here; only deletion is allowed from closed.)
+      if (updates.status === 'closed') {
+        await storage.closeProject(projectId, user.id);
+      }
+
+      const project = await storage.updateProject(projectId, user.id, updates as Partial<InsertProject>);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
@@ -269,10 +301,17 @@ export function registerProjectRoutes(app: Express): void {
     }
   });
 
-  app.delete('/api/projects/:projectId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+  // Deletion is allowed from both 'active' and 'closed' (the documented
+  // closed → deleted transition), so it deliberately does NOT use
+  // requireWriteAccess, which would reject closed projects.
+  app.delete('/api/projects/:projectId', requireAuth, requireProjectAccess, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       const { projectId } = req.params;
+      const lifecycleState = await storage.getProjectLifecycleState(projectId, user.id);
+      if (!lifecycleState || lifecycleState === 'deleted') {
+        return res.status(404).json({ message: 'Project not found' });
+      }
       const deleted = await storage.deleteProject(projectId, user.id);
       if (!deleted) {
         return res.status(404).json({ message: 'Project not found' });
@@ -308,7 +347,7 @@ export function registerProjectRoutes(app: Express): void {
       );
 
       if (!heroImagePath) {
-        return res.status(502).json({ message: 'Failed to generate hero illustration' });
+        return res.status(502).json({ message: 'Failed to generate hero image' });
       }
 
       return res.json({ heroImagePath });

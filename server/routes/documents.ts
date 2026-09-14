@@ -10,7 +10,10 @@ import { storage } from "../storage";
 import {
   insertDocumentSchema,
   insertDocumentAssociationSchema,
+  documentAnnotations,
 } from "@shared/schema";
+import { db } from "../db";
+import { and, asc, eq } from "drizzle-orm";
 import {
   requireAuth,
   requireProjectAccess,
@@ -50,7 +53,17 @@ export function registerDocumentsRoutes(app: Express): void {
 
         associationsMap[doc.id] = enrichedExplicit;
       }
-      return res.json({ documents, associations: associationsMap });
+
+      const annotationRows = await db.select().from(documentAnnotations)
+        .where(and(eq(documentAnnotations.projectId, projectId), eq(documentAnnotations.userId, user.id)))
+        .orderBy(asc(documentAnnotations.createdAt));
+      const annotationsMap: Record<string, typeof annotationRows> = {};
+      for (const doc of documents) annotationsMap[doc.id] = [];
+      for (const row of annotationRows) {
+        if (annotationsMap[row.documentId]) annotationsMap[row.documentId].push(row);
+      }
+
+      return res.json({ documents, associations: associationsMap, annotations: annotationsMap });
     } catch (error) {
       console.error('Error fetching documents:', error);
       return res.status(500).json({ message: 'Internal server error' });
@@ -241,6 +254,24 @@ export function registerDocumentsRoutes(app: Express): void {
     }
   });
 
+  /** Remove an association by document + type + entity (shape used by the client). */
+  app.delete('/api/projects/:projectId/documents/:docId/associations/:associationType/:entityId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { docId, associationType, entityId } = req.params;
+      const associations = await storage.getAssociationsByDocument(docId, user.id);
+      const match = associations.find(a => a.associationType === associationType && a.entityId === entityId);
+      if (!match) {
+        return res.status(404).json({ message: 'Association not found' });
+      }
+      await storage.deleteAssociation(match.id, user.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting association:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   app.delete('/api/projects/:projectId/document-associations/:assocId', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -252,6 +283,60 @@ export function registerDocumentsRoutes(app: Express): void {
       return res.json({ success: true });
     } catch (error) {
       console.error('Error deleting association:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // ============================================
+  // DOCUMENT ANNOTATIONS (append-only notes)
+  // ============================================
+
+  app.get('/api/projects/:projectId/documents/:docId/annotations', requireAuth, requireProjectAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, docId } = req.params;
+      const rows = await db.select().from(documentAnnotations)
+        .where(and(
+          eq(documentAnnotations.documentId, docId),
+          eq(documentAnnotations.projectId, projectId),
+          eq(documentAnnotations.userId, user.id),
+        ))
+        .orderBy(asc(documentAnnotations.createdAt));
+      return res.json({ annotations: rows });
+    } catch (error) {
+      console.error('Error fetching annotations:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/projects/:projectId/documents/:docId/annotations', requireAuth, requireProjectAccess, requireWriteAccess, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { projectId, docId } = req.params;
+      const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+      if (!content) {
+        return res.status(400).json({ message: 'Annotation content is required' });
+      }
+      if (content.length > 5000) {
+        return res.status(400).json({ message: 'Annotation is too long (max 5000 characters)' });
+      }
+
+      const document = await storage.getDocumentById(docId, user.id);
+      if (!document || document.projectId !== projectId) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+
+      const [created] = await db.insert(documentAnnotations).values({
+        documentId: docId,
+        projectId,
+        userId: user.id,
+        content,
+        createdBy: user.name || user.email || user.id,
+      }).returning();
+
+      return res.status(201).json(created);
+    } catch (error) {
+      console.error('Error creating annotation:', error);
       return res.status(500).json({ message: 'Internal server error' });
     }
   });

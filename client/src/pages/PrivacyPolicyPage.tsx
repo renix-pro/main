@@ -103,10 +103,10 @@ export default function PrivacyPolicyPage() {
             <section data-testid="section-ai-processing">
               <h2 className="text-lg font-semibold text-foreground mb-3">6. AI Processing and Third-Party Services</h2>
               <p className="text-muted-foreground mb-3">
-                RENIX uses Anthropic's Claude API to power its AI companion features, including document extraction, scope proposals, budget analysis, and conversational assistance. When you interact with AI features, relevant context from your project data may be sent to Anthropic for processing.
+                RENIX uses OpenAI's API to power its AI companion features, including document extraction, scope proposals, budget analysis, and conversational assistance. When you interact with AI features, relevant context from your project data may be sent to OpenAI for processing.
               </p>
               <p className="text-muted-foreground mb-3">
-                Anthropic processes this data according to their data usage policies. Under Anthropic's commercial API terms, data sent via the API is not used to train their models. We send only the minimum context necessary for each AI interaction.
+                OpenAI processes this data according to their data usage policies. As of our current agreement, data sent via the API is not used by OpenAI to train their models. We send only the minimum context necessary for each AI interaction.
               </p>
               <p className="text-muted-foreground">
                 We do not sell your data to any third party. Third-party service providers we use (hosting, AI processing, email delivery) are contractually bound to protect your data and use it only for the purposes we specify.
@@ -178,7 +178,7 @@ export default function PrivacyPolicyPage() {
                 RENIX is operated from Germany within the European Union. However, certain data processing activities involve transfers of personal data to countries outside the European Economic Area (EEA), specifically:
               </p>
               <ul className="list-disc list-inside space-y-2 text-muted-foreground mb-3">
-                <li><strong className="text-foreground">Anthropic Claude API (United States):</strong> When you use AI-powered features (document extraction, AI companion, scope proposals, budget analysis), relevant project context is transmitted to Anthropic's API servers located in the United States for processing. This transfer is necessary to provide the AI functionality described in our Terms of Service.</li>
+                <li><strong className="text-foreground">OpenAI API (United States):</strong> When you use AI-powered features (document extraction, AI companion, scope proposals, budget analysis), relevant project context is transmitted to OpenAI's API servers located in the United States for processing. This transfer is necessary to provide the AI functionality described in our Terms of Service.</li>
                 <li><strong className="text-foreground">Hosting Infrastructure:</strong> Our hosting provider may process data in data centres located within the EU or in jurisdictions that provide an adequate level of data protection as determined by the European Commission.</li>
               </ul>
               <p className="text-muted-foreground">
